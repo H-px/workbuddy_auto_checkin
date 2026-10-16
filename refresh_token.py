@@ -303,8 +303,11 @@ def main():
         print("\n[安全提醒] token 等同登录态，请勿粘贴到聊天、日志或任何第三方站点。", file=sys.stderr)
         return
 
+    # 注意：不能加 --body "-"。gh 会把 "-" 当字面值写进 Secret（实测写入长度 1 的
+    # 单字符），导致 runner 拿到 "Bearer -" 被网关 401。省略 --body 时 gh 才会
+    # 从 stdin 读取完整 token。
     proc = subprocess.run(
-        ["gh", "secret", "set", "WB_ACCESS_TOKEN", "--repo", gh_repo, "--body", "-"],
+        ["gh", "secret", "set", "WB_ACCESS_TOKEN", "--repo", gh_repo],
         input=token.encode("utf-8"),
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
