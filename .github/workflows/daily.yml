@@ -52,6 +52,11 @@ jobs:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
           WB_ENDPOINT: https://copilot.tencent.com
           WB_RESULT_FILE: ${{ runner.temp }}/wb_result.json
+          # token 失效（HTTP 401）时，飞书卡片直接给出本机可复制的续期命令。
+          # 折叠标量会把两行拼成一行；仓库名用表达式取，重命名仓库也不会过期。
+          WB_REFRESH_HINT: >-
+            token 已过期，请在本机 PowerShell 执行续期（成功后下一轮定时任务自动恢复，无需其他操作）：
+            `cd "C:\Users\74106\WorkBuddy\2026-10-16-11-16-09\workbuddy_auto_checkin-main"; & "C:\Users\74106\.workbuddy\binaries\python\versions\3.13.12\python.exe" refresh_token.py --gh-repo ${{ github.repository }}`
         run: |
           set -uo pipefail
           PY="${{ steps.py.outputs.python_path }}"
