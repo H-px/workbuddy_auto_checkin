@@ -22,6 +22,11 @@ DEFAULT_ENDPOINT = "https://copilot.tencent.com"
 REQUEST_TIMEOUT = 20
 MAX_RETRY = 3
 
+# token 失效时的续期提示。默认给通用文案；workflow 可通过 WB_REFRESH_HINT 注入
+# 本机可直接复制执行的命令（含解释器路径与仓库名），飞书卡片因此能直接告诉
+# 用户下一步怎么做。
+REFRESH_HINT = os.environ.get("WB_REFRESH_HINT") or "请在本机重新运行 refresh_token.py 注入新 token"
+
 CODE_NO_NETWORK = -1
 
 
@@ -133,7 +138,7 @@ def run_checkin(headers, endpoint):
     if scode == CODE_NO_NETWORK:
         return False, {"result": "NETWORK", "report": "网络不可达，签到未完成"}
     if scode in (401, 403):
-        return False, {"result": "AUTH", "report": "认证被拒（HTTP %s），请重新运行 refresh_token.py 注入新 token" % scode}
+        return False, {"result": "AUTH", "report": "认证被拒（HTTP %s）。%s" % (scode, REFRESH_HINT)}
     if not (200 <= scode < 300):
         return False, {"result": "ERROR", "report": "状态接口异常（HTTP %s）" % scode}
 
@@ -151,7 +156,7 @@ def run_checkin(headers, endpoint):
     if ccode == CODE_NO_NETWORK:
         return False, {"result": "NETWORK", "report": "领取请求未送达，签到未完成"}
     if ccode in (401, 403):
-        return False, {"result": "AUTH", "report": "认证被拒（HTTP %s）" % ccode}
+        return False, {"result": "AUTH", "report": "认证被拒（HTTP %s）。%s" % (ccode, REFRESH_HINT)}
 
     if _already_checked_in(ccode, cbody):
         _, fresh = post(endpoint + "/v2/billing/meter/checkin-activity-status", headers)
