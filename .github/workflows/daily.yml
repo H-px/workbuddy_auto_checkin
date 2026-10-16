@@ -18,7 +18,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # write 仅用于保活步骤向本仓库推送 keepalive.txt 心跳提交；
+  # 本仓库只含自动化脚本、无敏感内容，Secrets 也不会被本 workflow 读取。
+  contents: write
 
 concurrency:
   group: wb-daily
@@ -89,3 +91,26 @@ jobs:
           else
             echo "- 未产出结论文案，请查看上方日志" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: 仓库保活（心跳提交，防止定时任务因 60 天无动态被自动停用）
+        if: always()
+        run: |
+          set -uo pipefail
+          # GitHub 规则：公开仓库 60 天无「仓库动态」会自动禁用定时工作流，
+          # 而 workflow 运行本身不计入动态。这里每次运行顺带提交一次
+          # keepalive.txt 作为心跳，把计时器每天重置；同一 UTC 日只提交一次，
+          # 每天 3 次运行不会产生 3 个提交。keepalive.txt 同时是运行心跳：
+          # 看一眼最后修改时间就知道 workflow 上次什么时候跑的。
+          today="$(date -u '+%Y-%m-%d')"
+          if grep -q "last_run_utc: ${today}T" keepalive.txt 2>/dev/null; then
+            echo "今日（UTC）已保活，跳过"
+            exit 0
+          fi
+          printf 'last_run_utc: %s\nrun_url: %s/%s/actions/runs/%s\n' \
+            "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > keepalive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add keepalive.txt
+          git commit -m "chore: keepalive ${today}" || { echo "::warning::保活提交失败，请手动查看"; exit 0; }
+          git push || echo "::warning::保活推送失败（不影响签到结论；手动向仓库推送一次即可恢复动态）"
